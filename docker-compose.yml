@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: slipgajiweb
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=slipgaji
+      - DB_USERNAME=root
+      - DB_PASSWORD=secret
+      - CACHE_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      - REDIS_HOST=redis
+    volumes:
+      - .env:/var/www/html/.env
+      - storage:/var/www/html/storage
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - slipgaji-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: slipgaji-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: slipgaji
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_PASSWORD: secret
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - slipgaji-network
+
+  redis:
+    image: redis:alpine
+    container_name: slipgaji-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - slipgaji-network
+
+volumes:
+  mysql_data:
+  redis_data:
+  storage:
+
+networks:
+  slipgaji-network:
+    driver: bridge
