@@ -92,7 +92,9 @@ class SipenaService
                 'content_length' => strlen($response->body()),
             ]);
 
-            if ($response->successful()) {
+            // Check if response is PDF
+            $contentType = $response->header('Content-Type');
+            if ($contentType && str_contains($contentType, 'application/pdf')) {
                 return [
                     'success' => true,
                     'data' => $response->body(),
@@ -101,8 +103,38 @@ class SipenaService
                 ];
             }
 
-            return $this->handleError($response, 'search_slip_gaji');
+            // If not PDF, try to parse as JSON (error response)
+            try {
+                $jsonData = $response->json();
+                return [
+                    'success' => $jsonData['success'] ?? false,
+                    'message' => $jsonData['message'] ?? 'Terjadi kesalahan',
+                    'status_code' => $response->status(),
+                ];
+            } catch (\Exception $e) {
+                // Not JSON, return generic error
+                return [
+                    'success' => false,
+                    'message' => 'Terjadi kesalahan pada server',
+                    'status_code' => $response->status(),
+                ];
+            }
         } catch (\Illuminate\Http\Client\RequestException $e) {
+            // Parse 404 body for API message
+            $responseBody = $e->response->body();
+            try {
+                $jsonData = json_decode($responseBody, true);
+                if (isset($jsonData['message'])) {
+                    return [
+                        'success' => false,
+                        'message' => $jsonData['message'],
+                        'status_code' => 404,
+                    ];
+                }
+            } catch (\Exception $parseException) {
+                // Ignore JSON parse error
+            }
+            
             return $this->handleException($e, 'search_slip_gaji');
         }
     }
@@ -239,19 +271,27 @@ class SipenaService
     protected function handleError($response, string $context): array
     {
         $statusCode = $response->status();
+        
+        // Try to get message from API response first
         $errorMessage = config('sipena.error_messages.server_error');
 
-        if ($statusCode === 401) {
-            $errorMessage = config('sipena.error_messages.unauthorized');
-        } elseif ($statusCode === 404) {
-            $errorMessage = config('sipena.error_messages.not_found');
-        } elseif ($statusCode === 429) {
-            $errorMessage = config('sipena.error_messages.rate_limit');
-        }
-
-        $responseData = $response->json();
-        if (isset($responseData['message'])) {
-            $errorMessage = $responseData['message'];
+        // Parse JSON response
+        try {
+            $responseData = $response->json();
+            
+            // Use API's own message if available
+            if (isset($responseData['message']) && !empty($responseData['message'])) {
+                $errorMessage = $responseData['message'];
+            }
+        } catch (\Exception $e) {
+            // If not JSON, use status code based messages
+            if ($statusCode === 401) {
+                $errorMessage = config('sipena.error_messages.unauthorized');
+            } elseif ($statusCode === 404) {
+                $errorMessage = config('sipena.error_messages.not_found');
+            } elseif ($statusCode === 429) {
+                $errorMessage = config('sipena.error_messages.rate_limit');
+            }
         }
 
         Log::error("SIPENA API Error [{$context}]", [
@@ -271,14 +311,27 @@ class SipenaService
      */
     protected function handleException(\Illuminate\Http\Client\RequestException $e, string $context): array
     {
+        // Try to get message from response body first
         $errorMessage = config('sipena.error_messages.connection_error');
+
+        try {
+            if ($e->response) {
+                $responseBody = $e->response->body();
+                $jsonData = json_decode($responseBody, true);
+                if (isset($jsonData['message']) && !empty($jsonData['message'])) {
+                    $errorMessage = $jsonData['message'];
+                }
+            }
+        } catch (\Exception $parseException) {
+            // Ignore parse errors
+        }
 
         if ($e->getCode() === CURLE_OPERATION_TIMEDOUT) {
             $errorMessage = config('sipena.error_messages.timeout');
         }
 
         Log::error("SIPENA API Exception [{$context}]", [
-            'message' => $e->getMessage(),
+            'message' => $errorMessage,
             'code' => $e->getCode(),
         ]);
 
