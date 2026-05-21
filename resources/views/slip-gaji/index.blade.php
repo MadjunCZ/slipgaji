@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" type="image/png" href="{{ asset('logo-kemenag.png') }}">
-    <title>{{ $title ?? 'Cari Slip Gaji ASN' }}</title>
+    <title>{{ $title ?? ' Slip Gaji ASN Kementerian Agama Kabupaten Nganjuk' }}</title>
     
     <!-- Google Fonts - Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1011,21 +1011,6 @@
             </div>
         </div>
 
-        <!-- No Results Section -->
-        <div class="row justify-content-center" id="noResultsSection" style="display: none;">
-            <div class="col-12 col-lg-10 col-xl-8">
-                <div class="results-card">
-                    <div class="empty-state">
-                        <div class="empty-icon">
-                            <i class="bi bi-inbox"></i>
-                        </div>
-                        <h4 class="empty-title">Tidak Ada Data</h4>
-                        <p class="empty-text">Data slip gaji tidak ditemukan untuk kriteria yang dipilih.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Footer -->
         <footer class="page-footer">
             <p class="footer-text">
@@ -1275,10 +1260,9 @@
                 // Response is JSON - parse normally
                 const searchResult = await searchResponse.json();
                 
-                if (!searchResult.success || !searchResult.data || searchResult.data.length === 0) {
+                if (!searchResult.success) {
                     showToast('Gagal', searchResult.message || 'Data slip gaji tidak ditemukan', 'danger');
                     document.getElementById('resultsSection').style.display = 'none';
-                    document.getElementById('noResultsSection').style.display = 'block';
                     return;
                 }
                 
@@ -1325,17 +1309,14 @@
         // Display Results
         function displayResults(data) {
             const resultsSection = document.getElementById('resultsSection');
-            const noResultsSection = document.getElementById('noResultsSection');
             const tbody = document.getElementById('resultsBody');
             
             if (!data || (Array.isArray(data) && data.length === 0)) {
                 resultsSection.style.display = 'none';
-                noResultsSection.style.display = 'block';
                 return;
             }
             
             resultsSection.style.display = 'block';
-            noResultsSection.style.display = 'none';
             
             const items = Array.isArray(data) ? data : [data];
             
