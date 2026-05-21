@@ -34,21 +34,34 @@ class SlipGajiController extends Controller
             'darkMode' => $request->cookie('dark_mode', false),
         ];
 
-        // Get unit kerja and tujuan unduh options
+        // Get unit kerja from database
         try {
-            $unitKerjaResult = $this->repository->getUnitKerja();
-            $data['unitKerja'] = $unitKerjaResult['data'] ?? [];
+            $data['unitKerja'] = \DB::table('unit_kerja')
+                ->where('aktif', true)
+                ->orderBy('urutan')
+                ->orderBy('nama')
+                ->get(['kode', 'nama'])
+                ->map(function($item) {
+                    return (array) $item;
+                })
+                ->toArray();
         } catch (\Exception $e) {
             $data['unitKerja'] = [];
-            Log::warning('Failed to load unit kerja: ' . $e->getMessage());
+            Log::warning('Failed to load unit kerja from DB: ' . $e->getMessage());
         }
 
+        // Get keperluan from database
         try {
-            $tujuanUnduhResult = $this->repository->getTujuanUnduh();
-            $data['tujuanUnduh'] = $tujuanUnduhResult['data'] ?? [];
+            $data['keperluan'] = \DB::table('keperluan')
+                ->orderBy('id')
+                ->get(['id', 'nama'])
+                ->map(function($item) {
+                    return (array) $item;
+                })
+                ->toArray();
         } catch (\Exception $e) {
-            $data['tujuanUnduh'] = [];
-            Log::warning('Failed to load tujuan unduh: ' . $e->getMessage());
+            $data['keperluan'] = [];
+            Log::warning('Failed to load keperluan from DB: ' . $e->getMessage());
         }
 
         return view('slip-gaji.index', $data);
