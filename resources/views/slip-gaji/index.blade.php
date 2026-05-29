@@ -914,7 +914,7 @@
                                             <line x1="8" y1="2" x2="8" y2="6"/>
                                             <line x1="3" y1="10" x2="21" y2="10"/>
                                         </svg>
-                                        Periode Pembayaran
+                                        Periode
                                     </label>
                                     <input type="text" 
                                            class="form-control" 
@@ -1111,6 +1111,7 @@
                 ],
                 defaultDate: new Date(),
                 locale: "id",
+                disableMobile: true,
                 onChange: function(selectedDates, dateStr, instance) {
                     if (selectedDates.length > 0) {
                         const date = selectedDates[0];
