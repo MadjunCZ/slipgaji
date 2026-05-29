@@ -69,6 +69,7 @@ class SlipGajiController extends Controller
 
     /**
      * Search slip gaji via AJAX
+     * @return JsonResponse|\Illuminate\Http\Response
      */
     public function search(Request $request)
     {
@@ -114,10 +115,28 @@ class SlipGajiController extends Controller
                 ], 400);
             }
 
-            // Check if response is PDF
+            // Check if response is PDF (from JSON body with content_type)
             if (isset($result['content_type']) && $result['content_type'] === 'application/pdf') {
-                $pdfData = $result['data'];
-                $filename = 'slip_gaji_' . $request->nip . '_' . $request->tahun . sprintf('%02d', $request->bulan) . '.pdf';
+                // $result['data'] contains: {success, filename, content_type, document}
+                $apiData = $result['data'];
+                $pdfBase64 = $apiData['document'];
+                $pdfData = base64_decode($pdfBase64);
+                $filename = $apiData['filename'] ?? 'slip_gaji_' . $request->nip . '_' . $request->tahun . sprintf('%02d', $request->bulan) . '.pdf';
+                
+                Log::info('Using filename from API', ['filename' => $filename]);
+                
+                return response($pdfData)
+                    ->header('Content-Type', 'application/pdf')
+                    ->header('Content-Disposition', 'attachment; filename="' . rawurlencode($filename) . '"')
+                    ->header('Content-Length', strlen($pdfData));
+            }
+
+            // Handle new API response format with filename and document (base64 PDF)
+            $data = $result['data'] ?? [];
+            if (isset($data['filename']) && isset($data['document'])) {
+                $pdfBase64 = $data['document'];
+                $pdfData = base64_decode($pdfBase64);
+                $filename = $data['filename']; // Use filename from API response
                 
                 return response($pdfData)
                     ->header('Content-Type', 'application/pdf')
@@ -176,8 +195,74 @@ class SlipGajiController extends Controller
                 ], 400);
             }
 
+            // Handle PDF response (from JSON with content_type)
+            if (isset($result['content_type']) && $result['content_type'] === 'application/pdf') {
+                $apiData = $result['data'];
+                
+                // Check if data is array with document/filename
+                if (is_array($apiData) && isset($apiData['document']) && isset($apiData['filename'])) {
+                    $pdfBase64 = $apiData['document'];
+                    $pdfData = base64_decode($pdfBase64);
+                    $filename = $apiData['filename'];
+                    
+                    Log::info('Download using filename from API', ['filename' => $filename]);
+                    
+                    // Store temp file
+                    $tempPath = storage_path('app/temp/' . $filename);
+                    if (!is_dir(dirname($tempPath))) {
+                        mkdir(dirname($tempPath), 0755, true);
+                    }
+                    file_put_contents($tempPath, $pdfData);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Download siap',
+                        'download_url' => route('slip-gaji.download.file', ['filename' => $filename]),
+                        'filename' => $filename,
+                    ]);
+                }
+                
+                // Raw PDF body
+                $pdfData = is_string($apiData) ? $apiData : json_encode($apiData);
+                $filename = 'slip_gaji_' . $slipId . '_' . date('Ymd_His') . '.pdf';
+                
+                // Store temp file
+                $tempPath = storage_path('app/temp/' . $filename);
+                if (!is_dir(dirname($tempPath))) {
+                    mkdir(dirname($tempPath), 0755, true);
+                }
+                file_put_contents($tempPath, $pdfData);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Download siap',
+                    'download_url' => route('slip-gaji.download.file', ['filename' => $filename]),
+                    'filename' => $filename,
+                ]);
+            }
+
             // Handle different response types (base64 PDF, URL, or direct data)
             $data = $result['data'] ?? [];
+            // Handle new API response format with filename and document (base64 PDF)
+            if (isset($data['filename']) && isset($data['document'])) {
+                $pdfBase64 = $data['document'];
+                $pdfData = base64_decode($pdfBase64);
+                $filename = $data['filename']; // Use filename from API response
+                
+                // Store temp file
+                $tempPath = storage_path('app/temp/' . $filename);
+                if (!is_dir(dirname($tempPath))) {
+                    mkdir(dirname($tempPath), 0755, true);
+                }
+                file_put_contents($tempPath, $pdfData);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Download siap',
+                    'download_url' => route('slip-gaji.download.file', ['filename' => $filename]),
+                    'filename' => $filename,
+                ]);
+            }
 
             if (isset($data['pdf_base64']) || isset($data['data'])) {
                 $pdfBase64 = $data['pdf_base64'] ?? $data['data'];

@@ -103,9 +103,24 @@ class SipenaService
                 ];
             }
 
-            // If not PDF, try to parse as JSON (error response)
+            // Check if response is JSON with PDF in body (new API format)
             try {
                 $jsonData = $response->json();
+                
+                // Check if content_type in response body indicates PDF
+                $bodyContentType = $jsonData['content_type'] ?? null;
+                if ($bodyContentType && str_contains($bodyContentType, 'application/pdf')) {
+                    // New API format: {success, filename, content_type, document}
+                    // Wrap in 'data' key so controller can extract filename
+                    return [
+                        'success' => true,
+                        'data' => $jsonData, // Contains: {success, filename, content_type, document}
+                        'content_type' => 'application/pdf',
+                        'message' => $jsonData['message'] ?? 'PDF slip gaji berhasil diambil',
+                    ];
+                }
+                
+                // Regular JSON response (not PDF)
                 return [
                     'success' => $jsonData['success'] ?? false,
                     'message' => $jsonData['message'] ?? 'Terjadi kesalahan',
@@ -119,6 +134,7 @@ class SipenaService
                     'status_code' => $response->status(),
                 ];
             }
+
         } catch (\Illuminate\Http\Client\RequestException $e) {
             // Parse 404 body for API message
             $responseBody = $e->response->body();
@@ -148,21 +164,54 @@ class SipenaService
         $url = $this->baseUrl . $endpoint;
 
         try {
-            $response = $this->getClient()->post($url, [
+            $response = $this->getClient(true)->post($url, [
                 'id' => $slipId,
                 'keperluan' => $tujuanUnduh,
             ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
+            Log::info('SIPENA API Response [downloadSlip]', [
+                'status' => $response->status(),
+                'content_type' => $response->header('Content-Type'),
+                'content_length' => strlen($response->body()),
+            ]);
+
+            // Check if response is PDF
+            $contentType = $response->header('Content-Type');
+            if ($contentType && str_contains($contentType, 'application/pdf')) {
                 return [
                     'success' => true,
-                    'data' => $data['data'] ?? $data,
-                    'message' => $data['message'] ?? 'Success',
+                    'data' => $response->body(),
+                    'content_type' => 'application/pdf',
+                    'message' => 'PDF slip gaji berhasil diambil',
                 ];
             }
 
-            return $this->handleError($response, 'download_slip');
+            // Check if response is JSON with PDF in body
+            try {
+                $jsonData = $response->json();
+                
+                $bodyContentType = $jsonData['content_type'] ?? null;
+                if ($bodyContentType && str_contains($bodyContentType, 'application/pdf')) {
+                    return [
+                        'success' => true,
+                        'data' => $jsonData,
+                        'content_type' => 'application/pdf',
+                        'message' => $jsonData['message'] ?? 'PDF slip gaji berhasil diambil',
+                    ];
+                }
+                
+                return [
+                    'success' => true,
+                    'data' => $jsonData['data'] ?? $jsonData,
+                    'message' => $jsonData['message'] ?? 'Success',
+                ];
+            } catch (\Exception $e) {
+                return [
+                    'success' => false,
+                    'message' => 'Terjadi kesalahan pada server',
+                    'status_code' => $response->status(),
+                ];
+            }
         } catch (\Illuminate\Http\Client\RequestException $e) {
             return $this->handleException($e, 'download_slip');
         }

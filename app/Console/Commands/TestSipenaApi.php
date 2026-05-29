@@ -147,7 +147,15 @@ class TestSipenaApi extends Command
                 $result = $service->searchSlipGaji($nip, $bulan, $tahun, $unitKerja, $keperluan);
                 if ($result['success']) {
                     $data = $result['data'];
-                    if (is_array($data) && count($data) > 0) {
+                    
+                    // Check for new API response format with filename and document
+                    if (isset($data['filename']) && isset($data['document'])) {
+                        $this->info("   ✓ Success! New API format received");
+                        $this->info("   Filename: " . $data['filename']);
+                        $this->info("   Content-Type: " . ($data['content_type'] ?? 'application/pdf'));
+                        $docLength = strlen($data['document'] ?? '');
+                        $this->info("   Document size: " . number_format($docLength) . " bytes");
+                    } elseif (is_array($data) && count($data) > 0) {
                         $this->info("   ✓ Success! Found " . count($data) . " slip gaji");
                         foreach (array_slice($data, 0, 3) as $slip) {
                             $nama = $slip['nama'] ?? $slip['name'] ?? '-';

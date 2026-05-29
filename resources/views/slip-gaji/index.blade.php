@@ -1014,7 +1014,7 @@
         <!-- Footer -->
         <footer class="page-footer">
             <p class="footer-text">
-                &copy; {{ date('Y') }} <a href="#" class="footer-link"></a> - Sistem Informasi Penggajian Negeri
+                &copy; {{ date('Y') }} <a href="#" class="footer-link"></a> - Kantor Kementerian Agama Kabupaten Nganjuk. All rights reserved.
             </p>
         </footer>
     </div>
@@ -1243,7 +1243,16 @@
                 if (contentType && contentType.includes('application/pdf')) {
                     // Response is PDF - download directly
                     const blob = await searchResponse.blob();
-                    const filename = 'slip_gaji_' + formData.nip + '_' + formData.tahun + ('0' + formData.bulan).slice(-2) + '.pdf';
+                    
+                    // Try to get filename from Content-Disposition header
+                    const contentDisposition = searchResponse.headers.get('content-disposition');
+                    let filename = 'slip_gaji_' + formData.nip + '_' + formData.tahun + ('0' + formData.bulan).slice(-2) + '.pdf';
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8'')?["']?([^"'\s;]+)/i);
+                        if (filenameMatch) {
+                            filename = decodeURIComponent(filenameMatch[1]);
+                        }
+                    }
                     
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -1261,6 +1270,30 @@
                 // Response is JSON - parse normally
                 const searchResult = await searchResponse.json();
                 
+                // Check if API returned PDF directly in response
+                if (searchResult.content_type === 'application/pdf' && searchResult.document) {
+                    // API returns PDF as base64 in document field
+                    const pdfData = atob(searchResult.document);
+                    const pdfBytes = new Uint8Array(pdfData.length);
+                    for (let i = 0; i < pdfData.length; i++) {
+                        pdfBytes[i] = pdfData.charCodeAt(i);
+                    }
+                    const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    const pdfUrl = window.URL.createObjectURL(pdfBlob);
+                    const filename = searchResult.filename || 'slip_gaji_' + formData.nip + '.pdf';
+                    
+                    const a = document.createElement('a');
+                    a.href = pdfUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(pdfUrl);
+                    document.body.removeChild(a);
+                    
+                    showToast('Berhasil!', 'Slip gaji berhasil diunduh', 'success');
+                    return;
+                }
+                
                 if (!searchResult.success) {
                     showToast('Gagal', searchResult.message || 'Data slip gaji tidak ditemukan', 'danger');
                     document.getElementById('resultsSection').style.display = 'none';
@@ -1269,6 +1302,10 @@
                 
                 // Get first item for download
                 const firstItem = Array.isArray(searchResult.data) ? searchResult.data[0] : searchResult.data;
+                if (!firstItem) {
+                    showToast('Gagal', 'Data slip gaji tidak ditemukan', 'danger');
+                    return;
+                }
                 const slipId = firstItem.id || firstItem.slip_id || firstItem.nip || formData.nip;
                 
                 // Directly download
