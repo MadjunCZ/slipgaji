@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [SlipGajiController::class, 'index'])->name('slip-gaji.index');
 Route::prefix('slipgaji')->name('slip-gaji.')->group(function () {
     // Main page
-    Route::get('/', [SlipGajiController::class, 'index'])->name('index');
+    // Route::get('/', [SlipGajiController::class, 'index'])->name('index');
     
     // API endpoints
     Route::post('/search', [SlipGajiController::class, 'search'])->name('search');

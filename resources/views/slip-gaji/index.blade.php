@@ -467,6 +467,122 @@
             color: var(--text-secondary);
         }
 
+        /* Success Notification Overlay */
+        .notification-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .notification-overlay.show {
+            display: flex;
+            animation: fadeInOverlay 0.3s ease-out;
+        }
+
+        .notification-overlay.hide {
+            animation: fadeOutOverlay 0.3s ease-out forwards;
+        }
+
+        @keyframes fadeInOverlay {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeOutOverlay {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .notification-card {
+            background: white;
+            border-radius: var(--radius-2xl);
+            padding: 3rem 4rem;
+            text-align: center;
+            box-shadow: var(--shadow-xl);
+            animation: scaleIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        [data-bs-theme="dark"] .notification-card {
+            background: var(--card-bg);
+        }
+
+        .notification-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            animation: pulseNotification 0.6s ease-out;
+        }
+
+        @keyframes pulseNotification {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .notification-icon.success {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        }
+
+        .notification-icon.error {
+            background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+        }
+
+        .notification-icon i {
+            font-size: 2.5rem;
+            color: white;
+        }
+
+        .notification-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .notification-title.success {
+            color: var(--primary);
+        }
+
+        .notification-title.error {
+            color: #ef4444;
+        }
+
+        .notification-text {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 0;
+        }
+
         /* Results Section */
         .results-card {
             background: var(--card-bg);
@@ -634,21 +750,6 @@
             color: white;
         }
 
-        /* Toast */
-        .toast-container {
-            z-index: 10000;
-        }
-
-        .toast {
-            border: none;
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-xl);
-        }
-
-        .toast.bg-success {
-            background: var(--primary) !important;
-        }
-
         /* Dark Mode Toggle */
         .dark-toggle {
             position: fixed;
@@ -750,6 +851,24 @@
                 width: 48px;
                 height: 48px;
             }
+
+            .notification-card {
+                padding: 2rem 2.5rem;
+                margin: 1rem;
+            }
+
+            .notification-icon {
+                width: 70px;
+                height: 70px;
+            }
+
+            .notification-icon i {
+                font-size: 2rem;
+            }
+
+            .notification-title {
+                font-size: 1.25rem;
+            }
         }
 
         @media (max-width: 576px) {
@@ -813,6 +932,17 @@
             <div class="loading-spinner"></div>
             <h5 class="loading-title">Memproses...</h5>
             <p class="loading-text">Mohon tunggu sebentar</p>
+        </div>
+    </div>
+
+    <!-- Notification Overlay -->
+    <div class="notification-overlay" id="notificationOverlay">
+        <div class="notification-card">
+            <div class="notification-icon" id="notificationIcon">
+                <i class="bi" id="notificationIconI"></i>
+            </div>
+            <h5 class="notification-title" id="notificationTitle"></h5>
+            <p class="notification-text" id="notificationText"></p>
         </div>
     </div>
 
@@ -1053,18 +1183,6 @@
         </div>
     </div>
 
-    <!-- Toast Container -->
-    <div class="toast-container position-fixed top-0 end-0 p-3">
-        <div id="toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header">
-                <i class="bi bi-bell me-2 text-success"></i>
-                <strong class="me-auto" id="toastTitle">Notifikasi</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-            <div class="toast-body" id="toastMessage"></div>
-        </div>
-    </div>
-
     <!-- Dark Mode Toggle -->
     <button class="dark-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">
         <i class="bi bi-{{ $darkMode ? 'sun' : 'moon' }}"></i>
@@ -1197,25 +1315,25 @@
             
             // Validation
             if (!formData.nip) {
-                showToast('Error', 'NIP wajib diisi', 'danger');
+                showNotification('Error', 'NIP wajib diisi', 'error');
                 return;
             }
             
             if (!formData.bulan || !formData.tahun) {
-                showToast('Error', 'Bulan dan Tahun wajib dipilih', 'danger');
+                showNotification('Error', 'Bulan dan Tahun wajib dipilih', 'error');
                 return;
             }
             
             const unitKerjaSelect = document.getElementById('unit_kerja').value;
             if (unitKerjaSelect === 'Lainnya' && !document.getElementById('unit_kerja_custom').value.trim()) {
-                showToast('Error', 'Nama Unit Kerja wajib diisi', 'danger');
+                showNotification('Error', 'Nama Unit Kerja wajib diisi', 'error');
                 document.getElementById('unit_kerja_custom').focus();
                 return;
             }
             
             const tujuanSelect = document.getElementById('tujuan_unduh').value;
             if (tujuanSelect === 'Lainnya' && !document.getElementById('tujuan_custom').value.trim()) {
-                showToast('Error', 'Kepentingan/Tujuan wajib diisi', 'danger');
+                showNotification('Error', 'Kepentingan/Tujuan wajib diisi', 'error');
                 document.getElementById('tujuan_custom').focus();
                 return;
             }
@@ -1263,7 +1381,7 @@
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
                     
-                    showToast('Berhasil!', 'Slip gaji berhasil diunduh', 'success');
+                    showNotification('Berhasil!', 'Slip gaji berhasil diunduh', 'success');
                     return;
                 }
                 
@@ -1290,12 +1408,12 @@
                     window.URL.revokeObjectURL(pdfUrl);
                     document.body.removeChild(a);
                     
-                    showToast('Berhasil!', 'Slip gaji berhasil diunduh', 'success');
+                    showNotification('Berhasil!', 'Slip gaji berhasil diunduh', 'success');
                     return;
                 }
                 
                 if (!searchResult.success) {
-                    showToast('Gagal', searchResult.message || 'Data slip gaji tidak ditemukan', 'danger');
+                    showNotification('Gagal', searchResult.message || 'Data slip gaji tidak ditemukan', 'error');
                     document.getElementById('resultsSection').style.display = 'none';
                     return;
                 }
@@ -1303,7 +1421,7 @@
                 // Get first item for download
                 const firstItem = Array.isArray(searchResult.data) ? searchResult.data[0] : searchResult.data;
                 if (!firstItem) {
-                    showToast('Gagal', 'Data slip gaji tidak ditemukan', 'danger');
+                    showNotification('Gagal', 'Data slip gaji tidak ditemukan', 'error');
                     return;
                 }
                 const slipId = firstItem.id || firstItem.slip_id || firstItem.nip || formData.nip;
@@ -1330,13 +1448,13 @@
                     a.click();
                     document.body.removeChild(a);
                     
-                    showToast('Berhasil!', 'Slip gaji berhasil diunduh', 'success');
+                    showNotification('Berhasil!', 'Slip gaji berhasil diunduh', 'success');
                 } else {
-                    showToast('Gagal', downloadResult.message || 'Gagal mengunduh slip gaji', 'danger');
+                    showNotification('Gagal', downloadResult.message || 'Gagal mengunduh slip gaji', 'error');
                 }
             } catch (error) {
                 console.error('Search error:', error);
-                showToast('Error', 'Terjadi kesalahan sistem: ' + error.message, 'danger');
+                showNotification('Error', 'Terjadi kesalahan sistem: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
                 btnText.innerHTML = '<span id="btnSearchText">Proses Pencarian & Unduh</span>';
@@ -1421,7 +1539,11 @@
                 const result = await response.json();
                 
                 if (result.success && result.download_url) {
-                    showToast('Berhasil', 'Download slip gaji siap', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('downloadModal')).hide();
+                    
+                    setTimeout(() => {
+                        showNotification('Berhasil', 'Download slip gaji siap', 'success');
+                    }, 300);
                     
                     const a = document.createElement('a');
                     a.href = result.download_url;
@@ -1429,14 +1551,12 @@
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    
-                    bootstrap.Modal.getInstance(document.getElementById('downloadModal')).hide();
                 } else {
-                    showToast('Gagal', result.message || 'Download gagal', 'danger');
+                    showNotification('Gagal', result.message || 'Download gagal', 'error');
                 }
             } catch (error) {
                 console.error('Download error:', error);
-                showToast('Error', 'Terjadi kesalahan saat download', 'danger');
+                showNotification('Error', 'Terjadi kesalahan saat download', 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="bi bi-download me-1"></i> Download PDF';
@@ -1469,30 +1589,42 @@
             window.print();
         }
 
-        // Show Toast
-        function showToast(title, message, type = 'info') {
-            const toast = document.getElementById('toast');
-            const toastTitle = document.getElementById('toastTitle');
-            const toastMessage = document.getElementById('toastMessage');
+        // Show Notification Overlay
+        function showNotification(title, message, type = 'success') {
+            const overlay = document.getElementById('notificationOverlay');
+            const icon = document.getElementById('notificationIcon');
+            const iconI = document.getElementById('notificationIconI');
+            const titleEl = document.getElementById('notificationTitle');
+            const textEl = document.getElementById('notificationText');
             
-            toastTitle.textContent = title;
-            toastMessage.textContent = message;
+            // Set content
+            titleEl.textContent = title;
+            textEl.textContent = message;
             
-            const header = toast.querySelector('.toast-header');
+            // Set styles based on type
             if (type === 'success') {
-                header.className = 'toast-header bg-success text-white';
-                header.querySelector('i').className = 'bi bi-check-circle me-2';
-            } else if (type === 'danger') {
-                header.className = 'toast-header bg-danger text-white';
-                header.querySelector('i').className = 'bi bi-exclamation-circle me-2';
+                icon.className = 'notification-icon success';
+                iconI.className = 'bi bi-check-circle-fill';
+                titleEl.className = 'notification-title success';
             } else {
-                header.className = 'toast-header';
+                icon.className = 'notification-icon error';
+                iconI.className = 'bi bi-exclamation-circle-fill';
+                titleEl.className = 'notification-title error';
             }
             
-            toast.className = `toast bg-${type} text-white`;
+            // Show overlay
+            overlay.classList.remove('hide');
+            overlay.classList.add('show');
             
-            const bsToast = new bootstrap.Toast(toast, { delay: 4000 });
-            bsToast.show();
+            // Auto hide after 3 seconds
+            setTimeout(() => {
+                overlay.classList.remove('show');
+                overlay.classList.add('hide');
+                
+                setTimeout(() => {
+                    overlay.classList.remove('hide');
+                }, 300);
+            }, 3000);
         }
     </script>
 </body>
